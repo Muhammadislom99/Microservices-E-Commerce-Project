@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # SQL Server instances
+  sqlserver-users:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-users
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - users_data:/var/opt/mssql
+    networks:
+      - microservices-network
+
+  sqlserver-products:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-products
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1434:1433"
+    volumes:
+      - products_data:/var/opt/mssql
+    networks:
+      - microservices-network
+
+  sqlserver-orders:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-orders
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1435:1433"
+    volumes:
+      - orders_data:/var/opt/mssql
+    networks:
+      - microservices-network
+
+  # Microservices
+  user-service:
+    build:
+      context: ./UserService
+      dockerfile: Dockerfile
+    container_name: user-service
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-users;Database=UserDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+    ports:
+      - "5001:80"
+    depends_on:
+      - sqlserver-users
+    networks:
+      - microservices-network
+
+  product-service:
+    build:
+      context: ./ProductService
+      dockerfile: Dockerfile
+    container_name: product-service
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-products;Database=ProductDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+    ports:
+      - "5002:80"
+    depends_on:
+      - sqlserver-products
+    networks:
+      - microservices-network
+
+  order-service:
+    build:
+      context: ./OrderService
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-orders;Database=OrderDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Services__UserService=http://user-service:80
+      - Services__ProductService=http://product-service:80
+    ports:
+      - "5003:80"
+    depends_on:
+      - sqlserver-orders
+      - user-service
+      - product-service
+    networks:
+      - microservices-network
+
+  api-gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    environment:
+      - Services__UserService=http://user-service:80
+      - Services__ProductService=http://product-service:80
+      - Services__OrderService=http://order-service:80
+    ports:
+      - "5000:80"
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    networks:
+      - microservices-network
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - microservices-network
+
+volumes:
+  users_data:
+  products_data:
+  orders_data:
+
+networks:
+  microservices-network:
+    driver: bridge
