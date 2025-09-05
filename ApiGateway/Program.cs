@@ -1,8 +1,12 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Observability;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddMyOpenTelemetry("ApiGatewayService");
 
 // JWT Configuration
 var jwtKey = "YourSuperSecretKey1234567890123456";

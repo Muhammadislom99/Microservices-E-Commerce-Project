@@ -1,8 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Observability;
 using OrderService.Data;
 using OrderService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddMyOpenTelemetry("OrderService");
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

@@ -14,6 +14,11 @@ services:
       - users_data:/var/opt/mssql
     networks:
       - microservices-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   sqlserver-products:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -27,6 +32,11 @@ services:
       - products_data:/var/opt/mssql
     networks:
       - microservices-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   sqlserver-orders:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -40,60 +50,81 @@ services:
       - orders_data:/var/opt/mssql
     networks:
       - microservices-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # Microservices
   user-service:
     build:
-      context: ./UserService
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: UserService/Dockerfile
     container_name: user-service
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-users;Database=UserDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
     ports:
       - "5001:80"
     depends_on:
-      - sqlserver-users
+      sqlserver-users:
+        condition: service_healthy
     networks:
       - microservices-network
+    restart: on-failure
 
   product-service:
     build:
-      context: ./ProductService
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ProductService/Dockerfile
     container_name: product-service
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-products;Database=ProductDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
     ports:
       - "5002:80"
     depends_on:
-      - sqlserver-products
+      sqlserver-products:
+        condition: service_healthy
     networks:
       - microservices-network
+    restart: on-failure
 
   order-service:
     build:
-      context: ./OrderService
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: OrderService/Dockerfile
     container_name: order-service
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-orders;Database=OrderDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
       - Services__UserService=http://user-service:80
       - Services__ProductService=http://product-service:80
     ports:
       - "5003:80"
     depends_on:
-      - sqlserver-orders
-      - user-service
-      - product-service
+      sqlserver-orders:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
     networks:
       - microservices-network
+    restart: on-failure
 
   api-gateway:
     build:
-      context: ./ApiGateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ApiGateway/Dockerfile
     container_name: api-gateway
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
       - Services__UserService=http://user-service:80
       - Services__ProductService=http://product-service:80
       - Services__OrderService=http://order-service:80
@@ -105,7 +136,8 @@ services:
       - order-service
     networks:
       - microservices-network
-
+    restart: on-failure
+  
   frontend:
     build:
       context: ./Frontend
@@ -115,6 +147,48 @@ services:
       - "3000:80"
     depends_on:
       - api-gateway
+    networks:
+      - microservices-network
+    restart: on-failure
+
+  # --- OBSERVABILITY STACK ---
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus exporter
+    networks:
+      - microservices-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14250:14250" # gRPC для otel-collector
+    networks:
+      - microservices-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"   # Prometheus UI
+    networks:
+      - microservices-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"   # Grafana UI
     networks:
       - microservices-network
 
