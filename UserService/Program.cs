@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Observability;
@@ -41,7 +40,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddControllers();
 
 builder.Services.AddHealthChecks()
-    .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    // Self‑check — всегда Healthy, если сервис жив
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "self" })
+
+    // Пример зависимости
+    .AddSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        name: "sqlserver",
+        timeout: TimeSpan.FromSeconds(1)
+    );
+
+builder.Services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay = TimeSpan.Zero;           // без задержки перед первой публикацией
+    options.Period = TimeSpan.FromSeconds(5); // обновление каждые 5 секунд
+});
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -70,23 +85,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapHealthChecks("/health", new HealthCheckOptions()
+app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = _ => true,
-    ResponseWriter = async (context, report) =>
-    {
-        context.Response.ContentType = "application/json";
-        var result = JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                error = e.Value.Exception?.Message
-            })
-        });
-        await context.Response.WriteAsync(result);
-    }
+    Predicate = check => check.Name == "self"
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = _ => true // все проверки, включая зависимости
 });
 
 // Initialize database

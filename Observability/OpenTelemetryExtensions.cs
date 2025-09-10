@@ -31,6 +31,7 @@ public static class OpenTelemetryExtensions
                 metricsProviderBuilder
                     .SetExemplarFilter(ExemplarFilterType.AlwaysOn) // <--- включаем exemplars
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName))
+                    .AddMeter("HealthChecksMetrics") 
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()

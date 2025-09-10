@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
+using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Observability;
 
@@ -38,14 +40,39 @@ builder.Services.AddHttpClient("OrderService",
 
 builder.Services.AddControllers();
 
-builder.Services.AddHealthChecks()
-    .AddUrlGroup(new Uri(builder.Configuration["Services:OrderService"] + "/health"), name: "UserService",
-        tags: ["all", "service"])
-    .AddUrlGroup(new Uri(builder.Configuration["Services:ProductService"] + "/health"), name: "ProductService",
-        tags: ["all", "service"])
-    .AddUrlGroup(new Uri(builder.Configuration["Services:OrderService"] + "/health"), name: "OrderService",
-        tags: ["all", "services"]);
+// HealthChecks
+builder.Services
+    .AddHealthChecks()
+    // Self-check (жив ли сам сервис)
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "self", "live" })
 
+    // Зависимости ApiGateway — уникальные имена и теги
+    .AddUrlGroup(
+        new Uri(builder.Configuration["Services:UserService"] + "/health/ready"),
+        name: "UserService",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "deps", "ready" }
+    )
+    .AddUrlGroup(
+        new Uri(builder.Configuration["Services:ProductService"] + "/health/ready"),
+        name: "ProductService",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "deps", "ready" }
+    )
+    .AddUrlGroup(
+        new Uri(builder.Configuration["Services:OrderService"] + "/health/ready"),
+        name: "OrderService",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "deps", "ready" }
+    );
+
+
+builder.Services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay = TimeSpan.Zero; // без задержки перед первой публикацией
+    options.Period = TimeSpan.FromSeconds(5); // обновление каждые 5 секунд
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -73,24 +100,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapHealthChecks("/health", new HealthCheckOptions
+// /health/live — только self
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("self"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+// /health/ready — self + все зависимости
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = _ => true,
-    ResponseWriter = async (context, report) =>
-    {
-        context.Response.ContentType = "application/json";
-        var result = JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                error = e.Value.Exception?.Message
-            })
-        });
-        await context.Response.WriteAsync(result);
-    }
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
 
 
