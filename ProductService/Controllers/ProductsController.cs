@@ -36,6 +36,8 @@ namespace ProductService.Controllers
             if (product == null)
                 return NotFound();
 
+            await Task.Delay(500);
+
             var productDto = new ProductDto
             {
                 Id = product.Id,

@@ -1,12 +1,13 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 builder.Services.AddMyOpenTelemetry("ApiGatewayService");
+
 
 // JWT Configuration
 var jwtKey = "YourSuperSecretKey1234567890123456";
@@ -52,6 +53,17 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader());
 });
 
+
+// ... существующие сервисы (routing, OTel и т.д.)
+var cfg = builder.Configuration;
+
+
+// Привязка к readiness downstream сервисов (если нужно строго контролировать готовность шлюза)
+var productReady = cfg["Dependencies:ProductServiceReadyUrl"];
+var orderReady = cfg["Dependencies:OrderServiceReadyUrl"];
+var userReady = cfg["Dependencies:UserServiceReadyUrl"];
+
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -59,6 +71,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 
 app.UseCors("AllowAll");
 app.UseAuthentication();

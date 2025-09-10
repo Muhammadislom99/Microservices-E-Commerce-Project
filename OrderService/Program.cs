@@ -1,12 +1,14 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Observability;
 using OrderService.Data;
 using OrderService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 builder.Services.AddMyOpenTelemetry("OrderService");
+
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -35,6 +37,7 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader());
 });
 
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -42,6 +45,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 
 app.UseCors("AllowAll");
 app.MapControllers();
@@ -51,5 +55,6 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
     context.Database.EnsureCreated();
 }
+
 
 app.Run();

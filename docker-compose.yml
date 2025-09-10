@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  # SQL Server instances
+  # --- SQL Server instances ---
   sqlserver-users:
     image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: sqlserver-users
@@ -14,11 +12,6 @@ services:
       - users_data:/var/opt/mssql
     networks:
       - microservices-network
-    healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
   sqlserver-products:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -32,11 +25,6 @@ services:
       - products_data:/var/opt/mssql
     networks:
       - microservices-network
-    healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
   sqlserver-orders:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -50,13 +38,8 @@ services:
       - orders_data:/var/opt/mssql
     networks:
       - microservices-network
-    healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q 'SELECT 1'" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # Microservices
+  
+  # --- Microservices ---
   user-service:
     build:
       context: .
@@ -66,6 +49,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-users;Database=UserDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5001:80"
     depends_on:
@@ -84,6 +68,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-products;Database=ProductDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5002:80"
     depends_on:
@@ -104,6 +89,7 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver-orders;Database=OrderDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
       - Services__UserService=http://user-service:80
       - Services__ProductService=http://product-service:80
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5003:80"
     depends_on:
@@ -128,6 +114,7 @@ services:
       - Services__UserService=http://user-service:80
       - Services__ProductService=http://product-service:80
       - Services__OrderService=http://order-service:80
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5000:80"
     depends_on:
@@ -181,6 +168,9 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"   # Prometheus UI
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --enable-feature=exemplar-storage
     networks:
       - microservices-network
 

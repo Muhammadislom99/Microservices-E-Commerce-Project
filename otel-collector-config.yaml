@@ -14,6 +14,7 @@ exporters:
 
   prometheus:
     endpoint: "0.0.0.0:8889"
+    enable_open_metrics: true
 
 processors:
   batch:
