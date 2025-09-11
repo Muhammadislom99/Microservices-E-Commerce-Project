@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -9,7 +8,6 @@ using OrderService.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMyOpenTelemetry("OrderService");
-
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -85,5 +83,5 @@ using (var scope = app.Services.CreateScope())
     context.Database.EnsureCreated();
 }
 
-
+app.MapControllers();
 app.Run();
