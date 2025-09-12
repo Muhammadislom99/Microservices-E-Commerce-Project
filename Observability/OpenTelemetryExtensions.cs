@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+
 namespace Observability;
 
 public static class OpenTelemetryExtensions
@@ -21,17 +23,15 @@ public static class OpenTelemetryExtensions
                         options.SetDbStatementForText = true;
                         options.RecordException = true;
                     })
-                    .AddOtlpExporter(o =>
-                    {
-                        o.Endpoint = new Uri("http://otel-collector:4317");
-                    });
+                    .AddOtlpExporter(o => { o.Endpoint = new Uri("http://otel-collector:4317"); });
             })
             .WithMetrics(metricsProviderBuilder =>
             {
                 metricsProviderBuilder
                     .SetExemplarFilter(ExemplarFilterType.AlwaysOn) // <--- включаем exemplars
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName))
-                    .AddMeter("HealthChecksMetrics") 
+                    .AddMeter(serviceName)
+                    .AddMeter("HealthChecksMetrics")
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
@@ -44,9 +44,11 @@ public static class OpenTelemetryExtensions
                             // Подбери границы под свои RPS/латентности (пример для HTTP latency)
                             Boundaries = new double[] { 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10 }
                         })
-                    .AddOtlpExporter(o =>
+                    .AddOtlpExporter((o, m) =>
                     {
                         o.Endpoint = new Uri("http://otel-collector:4317");
+                        o.Protocol = OtlpExportProtocol.Grpc;
+                        m.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 1000;
                     });
             });
 
