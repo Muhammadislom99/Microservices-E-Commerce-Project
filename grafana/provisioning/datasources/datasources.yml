@@ -7,9 +7,15 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: true
-
+    exemplarTraceIdDestination:
+      internalLink: true
+      datasource: Jaeger
+      traceIdLabel: trace_id
+     
+     
   - name: Jaeger
     type: jaeger
     access: proxy
     url: http://jaeger:16686
     editable: true
+  
