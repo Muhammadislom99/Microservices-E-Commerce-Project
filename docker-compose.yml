@@ -50,6 +50,7 @@ services:
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=sqlserver-users;Database=UserDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
       - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+      - OTEL_TRACES_SAMPLER=always_on
     ports:
       - "5001:80"
     depends_on:
@@ -90,6 +91,7 @@ services:
       - Services__UserService=http://user-service:80
       - Services__ProductService=http://product-service:80
       - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+      - OTEL_TRACES_SAMPLER=always_on
     ports:
       - "5003:80"
     depends_on:
@@ -115,6 +117,7 @@ services:
       - Services__ProductService=http://product-service:80
       - Services__OrderService=http://order-service:80
       - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+      - OTEL_TRACES_SAMPLER=always_on
     ports:
       - "5000:80"
     depends_on:
@@ -142,7 +145,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
-    command: ["--config=/etc/otel/config.yaml"]
+    command: [ "--config=/etc/otel/config.yaml" ]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel/config.yaml
     ports:
@@ -182,7 +185,7 @@ services:
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/dashboards:/var/lib/grafana/dashboards    
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     networks:
       - microservices-network
 

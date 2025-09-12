@@ -8,16 +8,22 @@ receivers:
 
 exporters:
   otlp/jaeger:
-    endpoint: jaeger:4317
+    endpoint: jaeger:14250
     tls:
       insecure: true
 
   prometheus:
     endpoint: "0.0.0.0:8889"
     enable_open_metrics: true
+    # Важно! Включаем поддержку exemplars
+    send_timestamps: true
+    metric_expiration: 180m
+    add_metric_suffixes: false
 
 processors:
   batch:
+    timeout: 1s
+    send_batch_size: 1024
 
 service:
   pipelines:
