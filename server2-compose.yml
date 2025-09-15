@@ -10,8 +10,6 @@ services:
       - "1433:1433"
     volumes:
       - users_data:/var/opt/mssql
-    networks:
-      - micro_net
 
   sqlserver-products:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -23,8 +21,6 @@ services:
       - "1434:1433"
     volumes:
       - products_data:/var/opt/mssql
-    networks:
-      - micro_net
 
   user-service:
     build:
@@ -38,8 +34,6 @@ services:
       - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5001:80"
-    networks:
-      - micro_net
     restart: on-failure
 
   product-service:
@@ -54,14 +48,8 @@ services:
       - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
     ports:
       - "5002:80"
-    networks:
-      - micro_net
     restart: on-failure
 
 volumes:
   users_data:
   products_data:
-
-networks:
-  micro_net:
-    external: true
