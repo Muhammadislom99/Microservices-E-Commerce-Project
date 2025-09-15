@@ -1,0 +1,116 @@
+version: '3.8'
+services:
+  sqlserver-orders:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-orders
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1435:1433"
+    volumes:
+      - orders_data:/var/opt/mssql
+    networks:
+      - micro_net
+
+  order-service:
+    build:
+      context: .
+      dockerfile: OrderService/Dockerfile
+    container_name: order-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-orders;Database=OrderDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - Services__UserService=http://user-service:80
+      - Services__ProductService=http://product-service:80
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+    ports:
+      - "5003:80"
+    networks:
+      - micro_net
+    restart: on-failure
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ApiGateway/Dockerfile
+    container_name: api-gateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Services__UserService=http://user-service:80
+      - Services__ProductService=http://product-service:80
+      - Services__OrderService=http://order-service:80
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+    ports:
+      - "5000:80"
+    networks:
+      - micro_net
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    networks:
+      - micro_net
+    restart: on-failure
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    networks:
+      - micro_net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+    networks:
+      - micro_net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --enable-feature=exemplar-storage
+      - --web.enable-otlp-receiver
+    networks:
+      - micro_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - micro_net
+
+volumes:
+  orders_data:
+
+networks:
+  micro_net:
+    external: true

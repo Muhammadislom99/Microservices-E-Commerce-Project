@@ -1,0 +1,67 @@
+version: '3.8'
+services:
+  sqlserver-users:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-users
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - users_data:/var/opt/mssql
+    networks:
+      - micro_net
+
+  sqlserver-products:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-products
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1434:1433"
+    volumes:
+      - products_data:/var/opt/mssql
+    networks:
+      - micro_net
+
+  user-service:
+    build:
+      context: .
+      dockerfile: UserService/Dockerfile
+    container_name: user-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-users;Database=UserDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+    ports:
+      - "5001:80"
+    networks:
+      - micro_net
+    restart: on-failure
+
+  product-service:
+    build:
+      context: .
+      dockerfile: ProductService/Dockerfile
+    container_name: product-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=sqlserver-products;Database=ProductDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - OTEL_DOTNET_EXPERIMENTAL_METRICS_EXEMPLAR_FILTER=always_on
+    ports:
+      - "5002:80"
+    networks:
+      - micro_net
+    restart: on-failure
+
+volumes:
+  users_data:
+  products_data:
+
+networks:
+  micro_net:
+    external: true
