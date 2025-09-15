@@ -171,6 +171,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --enable-feature=exemplar-storage
+      - --web.enable-otlp-receiver
     networks:
       - microservices-network
 
@@ -179,6 +180,10 @@ services:
     container_name: grafana
     ports:
       - "3001:3000"   # Grafana UI
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards    
     networks:
       - microservices-network
 

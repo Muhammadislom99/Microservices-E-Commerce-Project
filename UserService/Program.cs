@@ -38,6 +38,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddControllers();
+
+builder.Services.AddHealthChecks()
+    // Self‑check — всегда Healthy, если сервис жив
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "self" })
+
+    // Пример зависимости
+    .AddSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        name: "sqlserver",
+        timeout: TimeSpan.FromSeconds(1)
+    );
+
+builder.Services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay = TimeSpan.Zero;           // без задержки перед первой публикацией
+    options.Period = TimeSpan.FromSeconds(5); // обновление каждые 5 секунд
+});
+
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -64,6 +84,16 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Name == "self"
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = _ => true // все проверки, включая зависимости
+});
 
 // Initialize database
 using (var scope = app.Services.CreateScope())

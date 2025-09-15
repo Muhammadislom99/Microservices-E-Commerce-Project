@@ -9,7 +9,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMyOpenTelemetry("OrderService");
 
-
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddDbContext<OrderDbContext>(options =>
@@ -26,6 +25,27 @@ builder.Services.AddHttpClient<IProductService, ProductService>(client =>
 });
 
 builder.Services.AddControllers();
+
+builder.Services.AddHealthChecks()
+    // Self‑check — всегда Healthy, если сервис жив
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "self" })
+
+    // Пример зависимости
+    .AddSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        name: "sqlserver",
+        timeout: TimeSpan.FromSeconds(1)
+    );
+
+
+
+builder.Services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
+builder.Services.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Delay = TimeSpan.Zero; // без задержки перед первой публикацией
+    options.Period = TimeSpan.FromSeconds(5); // обновление каждые 5 секунд
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -47,8 +67,15 @@ if (app.Environment.IsDevelopment())
 }
 
 
-app.UseCors("AllowAll");
-app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Name == "self"
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = _ => true // все проверки, включая зависимости
+});
 
 using (var scope = app.Services.CreateScope())
 {
@@ -56,5 +83,5 @@ using (var scope = app.Services.CreateScope())
     context.Database.EnsureCreated();
 }
 
-
+app.MapControllers();
 app.Run();
